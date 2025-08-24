@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Conta de {{ cliente.nome }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Conta do Cliente: {{ cliente.nome }}</h2>
+</div>
+
+<div class="table-container">
+    <h3>Notas com Anotação</h3>
+    {% if notas %}
+    <table>
+        <thead>
+            <tr>
+                <th>Nº da Nota</th>
+                <th>Data</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nota in notas %}
+            <tr>
+                <td>{{ nota.id }}</td>
+                <td>{{ nota.data.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td class="table-actions">
+                    <a href="{{ url_for('ver_nota', nota_id=nota.id) }}" class="btn-link">Ver Nota</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>Nenhuma anotação encontrada para este cliente.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Lançamento de Cargas (PDV){% endblock %}
+
+{% block content %}
+<div class="pdv-container">
+    <div class="pdv-left-panel">
+        <h2>Lançamento de Cargas</h2>
+        <div class="form-container">
+            <label for="cliente_select">Cliente (Anotação)</label>
+            <select id="cliente_select" name="cliente">
+                <option value="">Selecione o Cliente</option>
+                {% for cliente in clientes %}
+                <option value="{{ cliente.id }}">{{ cliente.nome }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="produto_search">Adicionar Produto</label>
+            <input type="text" id="produto_search" placeholder="Nome ou Código do Produto">
+            <select id="produto_select"></select>
+
+            <input type="number" id="quantidade_input" placeholder="Quantidade de Volumes" value="1">
+            
+            <button type="button" class="btn-add" onclick="adicionarItem()">Adicionar Item</button>
+        </div>
+    </div>
+    
+    <div class="pdv-right-panel">
+        <div class="carrinho-header">
+            <h3>Itens da Carga</h3>
+            <button class="btn-limpar" onclick="limparCarrinho()">Limpar</button>
+        </div>
+        <div class="carrinho-items" id="carrinho-items">
+            <p>Nenhum item adicionado.</p>
+        </div>
+        <div class="carrinho-footer">
+            <p>Total de volumes: <span id="total-volumes">0</span></p>
+            <div class="pdv-actions">
+                <button class="btn-finalizar avista" onclick="finalizarCarga('avista')">Finalizar (à Vista)</button>
+                <button class="btn-finalizar anotacao" onclick="finalizarCarga('anotacao')">Finalizar (Anotação)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        carregarCarrinho();
+        setupSearch();
+    });
+
+    function setupSearch() {
+        const searchInput = document.getElementById('produto_search');
+        const selectElement = document.getElementById('produto_select');
+        let searchTimeout;
+
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const query = searchInput.value;
+                if (query.length > 1) {
+                    fetch(`/buscar_produto/${query}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            selectElement.innerHTML = '';
+                            if (data.length > 0) {
+                                data.forEach(p => {
+                                    const option = document.createElement('option');
+                                    option.value = p.id;
+                                    option.textContent = `${p.nome} (${p.codigo})`;
+                                    selectElement.appendChild(option);
+                                });
+                            } else {
+                                selectElement.innerHTML = '<option value="">Nenhum produto encontrado</option>';
+                            }
+                        });
+                } else {
+                    selectElement.innerHTML = '';
+                }
+            }, 300);
+        });
+    }
+
+    function adicionarItem() {
+        const produtoId = document.getElementById('produto_select').value;
+        const quantidade = parseInt(document.getElementById('quantidade_input').value);
+        
+        if (!produtoId || quantidade <= 0) {
+            alert('Selecione um produto e uma quantidade válida.');
+            return;
+        }
+
+        fetch('/add_to_carrinho', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                produto_id: produtoId,
+                quantidade: quantidade
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                carregarCarrinho();
+                document.getElementById('produto_search').value = '';
+                document.getElementById('produto_select').innerHTML = '';
+                document.getElementById('quantidade_input').value = '1';
+            } else {
+                alert(data.message);
+            }
+        });
+    }
+
+    function carregarCarrinho() {
+        fetch('/get_carrinho')
+            .then(response => response.json())
+            .then(items => {
+                const carrinhoDiv = document.getElementById('carrinho-items');
+                const totalVolumesSpan = document.getElementById('total-volumes');
+                carrinhoDiv.innerHTML = '';
+                let totalVolumes = 0;
+
+                if (items.length === 0) {
+                    carrinhoDiv.innerHTML = '<p class="empty-cart">Nenhum item adicionado.</p>';
+                } else {
+                    const table = document.createElement('table');
+                    table.innerHTML = `
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Qtd</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${items.map(item => {
+                                totalVolumes += item.quantidade;
+                                return `
+                                    <tr>
+                                        <td>${item.produto_nome}</td>
+                                        <td><input type="number" value="${item.quantidade}" onchange="modificarItem(${item.produto_id}, this.value)" min="1"></td>
+                                        <td><button onclick="removerItem(${item.produto_id})" class="btn-excluir">Remover</button></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    `;
+                    carrinhoDiv.appendChild(table);
+                }
+                totalVolumesSpan.textContent = totalVolumes;
+            });
+    }
+
+    function modificarItem(produtoId, novaQuantidade) {
+        if (novaQuantidade <= 0) {
+            removerItem(produtoId);
+            return;
+        }
+        fetch('/modificar_carrinho', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                produto_id: produtoId,
+                quantidade: parseInt(novaQuantidade)
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                carregarCarrinho();
+            }
+        });
+    }
+
+    function removerItem(produtoId) {
+        if (!confirm('Deseja realmente remover este item?')) return;
+        fetch('/modificar_carrinho', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                produto_id: produtoId,
+                quantidade: 0
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                carregarCarrinho();
+            }
+        });
+    }
+    
+    function limparCarrinho() {
+        if (confirm('Tem certeza que deseja limpar o carrinho?')) {
+            fetch('/clear_carrinho')
+                .then(() => carregarCarrinho());
+        }
+    }
+
+    function finalizarCarga(tipo) {
+        const clienteId = document.getElementById('cliente_select').value;
+        
+        if (tipo === 'anotacao' && !clienteId) {
+            alert('Selecione um cliente para finalizar com anotação.');
+            return;
+        }
+
+        fetch('/finalizar_carga', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                cliente_id: clienteId,
+                tipo: tipo
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = data.redirect_url;
+            } else {
+                alert(data.message);
+            }
+        });
+    }
+</script>
+{% endblock %}
