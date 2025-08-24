@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Histórico de Cargas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Histórico de Notas</h2>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Nº da Nota</th>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Cliente</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nota in notas %}
+            <tr>
+                <td>{{ nota.id }}</td>
+                <td>{{ nota.data.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>{{ 'À Vista' if nota.tipo == 'avista' else 'Anotação' }}</td>
+                <td>{{ nota.cliente.nome if nota.cliente else 'N/A' }}</td>
+                <td class="table-actions">
+                    <a href="{{ url_for('ver_nota', nota_id=nota.id) }}" class="btn-link">Ver/Editar Nota</a>
+                    <form action="{{ url_for('excluir_nota', nota_id=nota.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir esta nota e todos os seus itens?');">
+                        <button type="submit" class="btn-link">Excluir</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
